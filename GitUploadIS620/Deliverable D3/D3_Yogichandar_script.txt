@@ -1,0 +1,535 @@
+--set the serveroutput on and execute the show erros to  view the errors.
+SET SERVEROUTPUT ON;
+show errors;
+-- deleting all the pre existing data.
+delete from orders_t;
+delete from restaurant_inventory_t;
+delete from menu_items_t;
+delete from customers_t;
+delete from waiter_t;
+delete from restaurant_t;
+delete from cuisine_type_t;
+
+--deleting all existing sequences 
+
+drop SEQUENCE cuisine_id_seq;
+drop sequence seq_customers;
+drop sequence orderID_seq;
+drop sequence rest_id_seq;
+drop sequence waiter_id_seq;
+drop SEQUENCE menuID_seq;
+
+-- deleting all the pre existing functions and procedures used in the code
+drop function find_cuisine_type_id;
+drop function find_restaurant_id;
+drop function find_waiter_id;
+drop function find_customer_id;
+drop function FIND_MENU_ITEM_ID;
+drop procedure add_new_cuisine;
+drop procedure add_new_restaurant;
+drop procedure details_of_waiter;
+drop procedure insertcustomer;
+drop procedure menu_items_insert;
+drop procedure RESTAURANT_INVENTORY_Insert;
+drop procedure hire_a_waiter;
+drop procedure tip_by_state;
+drop procedure tip_of_waiter;
+drop procedure insert_orders;
+
+
+-- deleting all the tables in the reverse order of creation that are used for the code.
+drop table orders_t;
+drop table restaurant_inventory_t;
+drop table menu_items_t;
+drop table customers_t;
+drop table waiter_t;
+drop table restaurant_t;
+drop table cuisine_type_t;
+
+/
+--creating sequiences that are used in the tables
+CREATE SEQUENCE cuisine_id_seq start with 1;
+CREATE SEQUENCE rest_id_seq start with 1;
+create sequence waiter_id_seq start with 10 increment by 1;
+
+--create the sequence for the Customer ID / primary key
+CREATE SEQUENCE seq_customers
+MINVALUE 1
+INCREMENT BY 1;
+
+CREATE SEQUENCE menuID_seq START WITH 1 MINVALUE 1
+increment by 1;
+
+-- creating a new sequence to insert the data into orders table using a sequence 
+CREATE SEQUENCE orderID_seq START WITH 1
+INCREMENT BY 1;
+
+-- Member 1 tables(Creation if Cuisine type and restaurant table)
+
+CREATE TABLE CUISINE_TYPE_T (cuisineid   int NOT NULL,cuisinename  varchar(30),Primary key (cuisineid));
+
+CREATE TABLE RESTAURANT_T (restaurantid  int NOT NULL,restaurantidname varchar(30),cuisineid  int,restaurantstraddress varchar(50),
+restaurantcity Varchar(50),restaurantstate varchar(50),restaurantzip  varchar(20), PRIMARY KEY (restaurantid),
+FOREIGN KEY (cuisineid) REFERENCES CUISINE_TYPE_T (cuisineid));
+
+
+--creation of waiter table with waiterid,restaurantid and waiter_name as attributes to the table MEMEBER 2 TASKS
+create table Waiter_T(
+WaiterID int,
+restaurantID int,
+waiter_name varchar(100),
+primary key(waiterID),
+foreign key (restaurantID) references restaurant_t (restaurantID));
+
+--create the Customers Table Member 5 Task
+CREATE TABLE Customers_T (
+   Customer_ID        INT     NOT NULL,
+    Customer_Name       VARCHAR(30),
+    Email               VARCHAR(30),
+    Street_Address      VARCHAR(50),
+    City                VARCHAR(30),
+    State1              CHAR(2),
+    Zip                 VARCHAR(10),
+    Credit_Card         VARCHAR(16), 
+PRIMARY KEY (Customer_ID));
+
+-- Creation of menu_item and restaurant inventory tables Member 3 tasks
+create table MENU_ITEMS_T(
+	menuID int,
+	menuName varchar(100),
+	menuPrice DECIMAL (10,2),
+	cuisineID int,
+	primary key (menuID),
+	foreign key (cuisineID) references CUISINE_TYPE_T(cuisineID)
+	);
+
+create table RESTAURANT_INVENTORY_T(
+	restaurantQuantity int,
+	restaurantMenuName varchar(100),
+	menuID int,
+	restaurantInvID int,
+	foreign key (menuID) references MENU_ITEMS_T(menuID),
+	foreign key (restaurantInvID) references RESTAURANT_T (restaurantID)
+	);
+    
+-- creation of orders table (Member 4)
+CREATE table ORDERS_T ( 
+    Order_ID INT,
+    RestaurantID INT,
+    Customer_ID INT,
+    MenuID INT,
+    WaiterID INT,
+    Order_Date Date,
+    Amount_Paid Decimal(10,2),
+    Tip Decimal(10,2),
+    PRIMARY KEY (Order_ID), -- unique and notnull
+    -- foreign keys to join the tables with the parent table
+    FOREIGN KEY (RestaurantID) REFERENCES RESTAURANT_T (RestaurantID),
+    FOREIGN KEY (Customer_ID) REFERENCES CUSTOMERS_T (Customer_ID),
+    FOREIGN KEY (MenuID) REFERENCES MENU_ITEMS_T (MenuID),
+    FOREIGN KEY (WaiterID) REFERENCES WAITER_T (WaiterID)
+    );
+/
+
+/* helper functions to find the ids from different tables*/
+-- creation of cuisine type id helper function(Member 1 code)
+CREATE OR REPLACE FUNCTION find_cuisine_type_id( cuisine_name IN varchar) 
+RETURN number IS
+cuisine_id number;
+BEGIN
+
+        SELECT cuisineid INTO cuisine_id FROM cuisine_type_T 
+        WHERE  cuisinename = cuisine_name;
+        RETURN cuisine_id;
+        -- EXECPTIONS---------------
+            EXCEPTION
+                WHEN NO_DATA_FOUND then 
+                DBMS_OUTPUT.PUT_LINE('No data found');
+            RETURN -1;
+    END; 
+ 
+/   
+
+--creation of find_restaurant_id helper function(member 1)
+Create or replace function find_restaurant_id(r_name in varchar)
+return number
+IS
+r_id number;
+BEGIN
+	select  restaurantid  into r_id from restaurant_t
+    where   restaurantidname  = r_name;
+	return r_id;
+exception
+	when no_data_found then
+	dbms_output.put_line('no such restaurants');
+	return -1;
+End;
+/
+-- creating a new function find_waiter_id as a helper function. name of the waiter is passed as input for the function.
+
+create or replace function find_waiter_id(wname in varchar) /*wname is passed as input parameter to get waiter id*/
+return int 
+is 
+w_id int;/* waiter id is stored in the local variable called as w_id*/
+begin
+select waiterid into w_id from waiter_t where waiter_name= wname; /* implicit cursor to get the waiter id*/
+return w_id;
+exception 
+when no_data_found then
+dbms_output.put_line('no such waiter exists');
+return -1;
+end;
+
+/
+-- Creation of Helper function find_customer_id
+CREATE OR REPLACE FUNCTION FIND_Customer_ID(custLook IN VARCHAR) return int
+AS returnCustomer int;
+BEGIN
+	select Customer_ID                       
+	into returnCustomer                     
+	from Customers_T                         
+	where Customer_Name = custLook;                       
+	return returnCustomer;                       
+exception
+	when no_data_found then
+	dbms_output.put_line('no such customer');                        
+	return -1;                                          
+END;
+/
+--creation of new procedure add_new_cuisine(Member 1 Task)
+CREATE OR REPLACE PROCEDURE Add_new_Cuisine(cuisine_name IN varchar) 
+AS
+BEGIN
+INSERT INTO CUISINE_TYPE_T VALUES (cuisine_id_seq.nextval,cuisine_name);
+            -- EXECPTIONS---------------
+            EXCEPTION
+                WHEN NO_DATA_FOUND then 
+                DBMS_OUTPUT.PUT_LINE('No data found');
+
+    END; 
+/
+-- Creation of procedure Add_new_restaurant to add a new restaurant into database(Member1 Task)
+CREATE OR REPLACE PROCEDURE Add_new_Restaurant (rest_name    IN   varchar, cuisine     IN   varchar,str_address IN   varchar,rest_city      IN   Varchar,
+rest_state    IN   varchar,rest_zip       IN   varchar) 
+AS                                               
+BEGIN                                
+INSERT INTO RESTAURANT_T VALUES (rest_id_seq.nextval,rest_name,cuisine,str_address,rest_city,rest_state,rest_zip);
+            -- EXECPTIONS---------------
+EXCEPTION
+WHEN NO_DATA_FOUND then 
+DBMS_OUTPUT.PUT_LINE('No data found');
+END;
+/
+
+--creation of a procedure to hire a waiter(for insertion of data) waiter name(wname_insert) and restaurant name(rname_insert) are passed as input parameters for the function.
+
+create or replace procedure hire_a_waiter(wname_insert in varchar,rname_insert in varchar)
+IS
+restid int :=-1; -- initially restaurant id is decalred as -1 to avoid any errors. if -1 is set as default in case of no restaurant it directly writes no such restaurant from find_restaurant_id function
+ BEGIN
+ restid:=find_restaurant_id (rname_insert);
+  insert into waiter_t values (waiter_id_seq.nextval,restid,wname_insert); -- data insertion into waiters table.
+  dbms_output.put_line ('a new waiter is added into the data base'); -- Acknowleding that a new waiter is added to the waiter
+ exception 
+  when others then 
+   dbms_output.put_line ('waiter could not be inserted'); -- handling the errors
+ END;
+/
+--creating a new procedure to show the details of the waiter, restaurant name is passed as an input paramater
+
+create or replace procedure details_of_waiter(rname in varchar)
+is
+r_id int := find_restaurant_id(rname);-- finding restaurant id for the given name of restaurant.
+Begin
+for i in (select waiterid,restaurantid,waiter_name from waiter_t where  restaurantid = r_id)-- the query specifies the range where the i is valid.
+    loop
+   dbms_output.put_line('wid :' || i.waiterid || '  rid :' || i.restaurantid|| 'waitername :  ' || i.waiter_name);-- handling the output values
+    end loop;
+exception 
+when others then
+dbms_output.put_line('no records found, please re enter the data');-- handling the output.
+END;
+
+/
+-- Creation of new procedure to insert the data into the customer table.
+create or replace PROCEDURE insertCustomer(
+    new_custID IN customers_t.customer_id%type,
+    new_custName IN customers_t.customer_name%type,
+    new_custEmail IN customers_t.email%type,
+    new_custStreet IN customers_t.street_address%type,
+    new_custCity IN customers_t.city%type,
+    new_custState1 IN customers_t.state1%type,
+    new_custZip IN customers_t.zip%type,
+    new_custCC IN customers_t.credit_card%type)
+
+IS 
+BEGIN
+INSERT INTO CUSTOMERS_T (customer_id, customer_name, email, street_address, city, state1, zip, credit_card)
+VALUES (new_custID, new_custName, new_custEmail, new_custStreet, new_custCity, new_custState1, new_custZip, new_custCC);
+END;
+/
+-- creation of new procedure find_menu_item_id to retrive the id(Member 3 Task)
+CREATE OR REPLACE function FIND_MENU_ITEM_ID (meNAME varchar2) 
+RETURN int
+as
+meID int;
+BEGIN
+    SELECT menuID
+    INTO meID
+    FROM menu_items_T
+    WHERE menuName = meNAME;
+    RETURN meID;
+ EXCEPTION
+    WHEN no_data_found then
+    DBMS_output.put_line('no such Menu');
+ RETURN -1;
+END;
+/
+-- Creation of a new procedure to insert the menu items into menu table(Member 3 task)
+create or replace procedure menu_items_insert(menuNameInsert varchar, menuPriceInsert decimal, cuisineNameInsert varchar)
+as
+begin
+	insert into MENU_ITEMS_T values(menuID_seq.nextval, menuNameInsert, menuPriceInsert, FIND_CUISINE_TYPE_ID(cuisineNameInsert)); /* SQL statement to insert passed values*/
+end;
+/
+--  creation of new procedure Restaurant_inventory_insert to insert the data into restanurant inventory table 
+create or replace procedure RESTAURANT_INVENTORY_Insert(restaurantQuantityInsert int, menuNameInsert varchar, restaurantNameCheck varchar)
+as
+restaurantID int;
+menu_Item_ID int;
+begin
+	restaurantID := FIND_RESTAURANT_ID(restaurantNameCheck);
+	menu_item_ID := FIND_MENU_ITEM_ID(menuNameInsert);
+	insert into RESTAURANT_INVENTORY_T values(restaurantQuantityInsert, menuNameInsert, menu_item_ID, restaurantID); /* SQL statement to insert passed values*/
+end;
+/
+
+CREATE OR REPLACE procedure INSERT_ORDERS(
+        newOrderID IN orders_t.order_id%type,
+        restID IN orders_t.restaurantID%type,
+        newCustID IN orders_t.customer_id%type,
+        newMenuID IN orders_t.menuid%type,
+        waitID IN orders_t.waiterid%type,
+        newDate IN orders_t.order_date%type,
+        newPay IN orders_t.amount_paid%type,
+        newTip IN orders_t.tip%type)
+as
+BEGIN --PL/SQL insert statement within the procedure
+    INSERT INTO orders_T (
+            order_ID, restaurantID, customer_ID, menuID, waiterID, order_Date, amount_Paid, tip)
+    VALUES (
+            newOrderID, restID, newCustID, newMenuID, waitID, newDate, newPay, newTip);
+END;
+
+/
+
+-- a test example to check whether the function is able to retrieve the data or not. Member 2 resposibilities.
+declare 
+INFO int;
+begin
+INFO :=find_waiter_id('yogi');-- function call, the id is stored in the local variable info.
+dbms_output.put_line('waiter id is'||INFO);-- The output says there is no such waiter, as there is no waiter in the name of yogi.
+end;
+/
+
+--Populating the data into cuisine type and restaurant table using respective procedures created by member 1. 
+exec Add_new_Cuisine('American');
+exec Add_new_Cuisine('Italian');
+exec Add_new_Cuisine('BBQ');
+exec Add_new_Cuisine('Indian');
+exec Add_new_Cuisine('Ethiopian');
+
+
+EXEC Add_new_Restaurant('Ribs_R_US',find_cuisine_type_id('American'),'1000 Hilltop Circle','Baltimore','MD','21250');
+EXEC Add_new_Restaurant('Bella Italia',find_cuisine_type_id('Italian'),'214 Garden','Catonsville','MD','21043');
+EXEC Add_new_Restaurant('Roma', find_cuisine_type_id('Italian'),'Route 40','Catonsville','MD','21043');
+EXEC Add_new_Restaurant('Bull Roast',find_cuisine_type_id('BBQ'),'Mount view drive','Rockville','NY','10013');
+EXEC Add_new_Restaurant('Taj Mahal', find_cuisine_type_id('Indian'),'Route 40','Downtown','NY','10013');
+EXEC Add_new_Restaurant('selasie', find_cuisine_type_id('Ethiopian'),'Walker ave','Downtown','PA','16822');
+/
+
+
+--Selecting the data from waiter before we populate the table with inserts using the procedures.
+select * from waiter_t;
+/*
+--manual insertion of data to check working of sequnce
+
+insert into waiter_t values(waiter_id_seq.nextval,1,'riley');
+insert into waiter_t values(waiter_id_seq.nextval,2,'rohan');
+insert into waiter_t values(waiter_id_seq.nextval,1,'meghana');
+insert into waiter_t values(waiter_id_seq.nextval,3,'ram');
+insert into waiter_t values(waiter_id_seq.nextval,1,'mary');
+insert into waiter_t values(waiter_id_seq.nextval,2,'john');
+-- Getting what data pre exists before creation of procedures 
+select * from waiter_t;
+*/
+
+
+-- insertion of data into waiter table using the procedure created.
+exec hire_a_waiter('Jack','Ribs_R_US');
+exec hire_a_waiter('Jill','Ribs_R_US');
+exec hire_a_waiter('Wendy','Ribs_R_US');
+exec hire_a_waiter('Hailey','Ribs_R_US');
+exec hire_a_waiter('Mary','Bella Italia');
+exec hire_a_waiter('Pat','Bella Italia');
+exec hire_a_waiter('Michael','Bella Italia');
+exec hire_a_waiter('Rakesh','Bella Italia');
+exec hire_a_waiter('Verma','Bella Italia');
+exec hire_a_waiter('Mike','Roma');
+exec hire_a_waiter('judy','Roma');
+exec hire_a_waiter('trevor','selasie');
+exec hire_a_waiter('chap','Taj Mahal');
+exec hire_a_waiter('hannah','Bull Roast');
+-- To view the waiters that are working the restuarant bella italia.(Part of D2 member 2 resposibilities)
+--Mary,pat,micheal,rakesh,verma are obtained as output as they are woking in bella italia
+exec details_of_waiter('Bella Italia');
+/
+
+-- Populating the data into customers table, Menu table,Resuarnt inventory table and orders table(A set of dummy data is inserted)
+exec insertcustomer(seq_customers.nextval,'yogi','yogichb1@umbc.edu','4702 aldgate grn','Baltimore','MD','21227','1234345656787890');
+exec insertcustomer(seq_customers.nextval,'cust1','cust1@umbc.edu','4712 aldgate grn','Baltimore','MD','21045','3456456756787890');
+exec insertcustomer(seq_customers.nextval,'cust11','cust11@umbc.edu','4720 aldgate grn','Baltimore','MD','21045','1234456756787890');
+exec insertcustomer(seq_customers.nextval,'cust3','cust3@umbc.edu','4721 aldgate grn','Baltimore','MD','21046','1234456756787812');
+exec insertcustomer(seq_customers.nextval,'cust111','cust111@umbc.edu','4722 aldgate grn','Baltimore','MD','21045','1234456656787812');
+exec insertcustomer(seq_customers.nextval,'custNY1','custNY1@umbc.edu','4711 aldgate grn','Times sqaure','NY','10045','2235546756787812');
+exec insertcustomer(seq_customers.nextval,'custNY2','custNY2@umbc.edu','4821 aldgate grn','Times sqaure','NY','10045','4567456756787812');
+exec insertcustomer(seq_customers.nextval,'custNY3','custNY3@umbc.edu','4822 aldgate grn','Times square','NY','10045','1234456756123412');
+exec insertcustomer(seq_customers.nextval,'cust3','custPA1@umbc.edu','4812 aldgate grn','Fairless hills','PA','16822','4534456756787812');
+exec insertcustomer(seq_customers.nextval,'cust3','custPA2@umbc.edu','4134 aldgate grn','Fairless hills','PA','16822','3434456756787812');
+exec insertcustomer(seq_customers.nextval,'cust3','custPA3@umbc.edu','4817 aldgate grn','Fairless hills','PA','16822','5634456756787812');
+
+exec menu_items_insert('burger', 10, 'American');
+exec menu_items_insert('fries',5,'American');
+exec menu_items_insert('pasta', 15, 'American');
+exec menu_items_insert('salad', 10, 'American');
+exec menu_items_insert('salmon', 20, 'American');
+
+exec menu_items_insert('steak', 25, 'BBQ');
+exec menu_items_insert('burger', 10, 'BBQ');
+exec menu_items_insert('pork loin', 15, 'BBQ');
+exec menu_items_insert('fillet mignon', 30, 'BBQ');
+
+exec menu_items_insert('dal soup', 10, 'Indian');
+exec menu_items_insert('rice', 5, 'Indian');
+exec menu_items_insert('tandoori chicken', 10, 'Indian');
+exec menu_items_insert('samosa', 8, 'Indian');
+
+exec menu_items_insert('lasagna', 15, 'Italian');
+exec menu_items_insert('meatballs', 10, 'Italian');
+exec menu_items_insert('spaghetti', 15, 'Italian');
+exec menu_items_insert('pizza', 20, 'Italian');
+
+exec menu_items_insert('meat chunks', 12, 'Ethiopian');
+exec menu_items_insert('legume stew', 10, 'Ethiopian');
+exec menu_items_insert('flatbread', 3, 'Ethiopian');
+
+
+
+exec RESTAURANT_INVENTORY_Insert(150, 'fries', 'Ribs_R_US');
+exec RESTAURANT_INVENTORY_Insert(10, 'lasagna', 'Bella Italia');
+exec RESTAURANT_INVENTORY_Insert(15, 'steak', 'Bull Roast');
+exec RESTAURANT_INVENTORY_Insert(50, 'fillet mignon', 'Bull Roast');
+exec RESTAURANT_INVENTORY_Insert(50, 'dal soup', 'Taj Mahal');
+exec RESTAURANT_INVENTORY_Insert(500, 'rice', 'Taj Mahal');
+exec RESTAURANT_INVENTORY_Insert(150, 'samosa', 'Taj Mahal');
+exec RESTAURANT_INVENTORY_Insert(150, 'meat chunks', 'selasie');
+exec Restaurant_inventory_insert(150, 'legume stew','selasie');
+
+
+delete from orders_t;
+insert into orders_t values(orderid_seq.nextval,2,2,17,14,date'2022-03-10',20,0.2*20);
+insert into orders_t values(orderid_seq.nextval,2,3,16,14,date'2022-03-15',30,0.2*30);
+insert into orders_t values(orderid_seq.nextval,2,3,17,14,date'2022-03-15',20,0.2*20);
+insert into orders_t values(orderid_seq.nextval,4,6,9,23,date'2022-04-01',60,0.2*60);
+insert into orders_t values(orderid_seq.nextval,4,6,9,23,date'2022-04-02',60,0.2*60);
+insert into orders_t values(orderid_seq.nextval,4,7,8,23,date'2022-04-01',15,0.2*15);
+
+
+
+
+
+
+-- Viewing the data that is inserted into the table.
+select * from cuisine_type_t;
+select * from restaurant_t;
+select * from waiter_t;
+select * from customers_t;
+select * from menu_items_t;
+select * from restaurant_inventory_t;
+select * from orders_t;
+
+
+/
+
+--DELIVERABLE D3 MEBBER 2 TASKS 
+-- New procedure To compute the tips of the waiter 
+
+create or replace procedure tip_of_waiter
+is 
+-- an explict cursor is used to store the details of waiter such as waiterid,waiter name,Total tip
+-- an aggregation sum(tips) is used to compute the tip of waiter.
+cursor c1 is 
+select waiter_t.waiterid,waiter_t.waiter_name, sum(orders_t.tip) as total_tip 
+from orders_t,waiter_t 
+where orders_t.waiterid=waiter_t.waiterid 
+group by waiter_t.waiterid,waiter_t.waiter_name; 
+-- group by statement is used to display the waiter id,waiter name along with the tip of waiter.
+BEGIN
+dbms_output.put_line('waiter id'||'   '||'waiter name'||'   '||'Total tip of waiter');
+-- fetching the values into x from cursor using the for loop.
+FOR x in C1
+loop
+dbms_output.put_line(x.waiterid||'          ' || x.waiter_name||'           '|| x.Total_tip    ); -- handling the outputs.
+exit when C1%notfound; -- ecit condition for the loop.
+END loop;
+Exception
+when no_data_found then -- handling the exceptions
+dbms_output.put_line('No data found');
+when others then
+dbms_output.put_line('please check back');
+END;
+
+/
+
+-- creating new procedure tip_by_state which returns the tips of each state
+create or replace procedure tip_by_state 
+is
+-- created an explicit cursor to store the details of sum of tips for each state and state information
+cursor c1 is
+select sum(orders_t.tip),restaurant_t.restaurantstate from orders_t,restaurant_t
+where orders_t.restaurantid=restaurant_t.restaurantid 
+group by restaurant_t.restaurantstate;
+-- to group the data using the state.
+-- two local variables total_tip and state_name are declared to store the information from the cursor.
+total_tip number;
+state_name varchar(100);
+begin
+dbms_output.put_line('Tip'||'   '||'state');-- handling the output. This statement is used to display the output in a organised manner.
+open c1;
+loop
+-- Fetching the data from cursor c1 into loacal variables total_tip and state_name
+fetch c1 into total_tip,state_name;
+exit when c1%NOTFOUND; -- exit condition for the loop.
+dbms_output.put_line(total_tip||'   ' ||state_name     );-- Handling the output.
+end loop;
+exception
+when no_data_found then
+dbms_output.put_line('No data found');
+when others then
+dbms_output.put_line('please check back');
+close c1;-- close the cursor c1.
+end;
+/
+
+-- executing the procedure details of waiter to obtain the details of waiters working in the roma restaurant
+--Mike and Judy are obtained as output as they are working in Roma restarurant.
+exec details_of_waiter('Roma');
+-- calling the procedure tip_of_waiter to report the tips of each indivual waiter working.
+exec tip_of_waiter;
+-- calling the procedure tip_by_state to report the tips state wise.
+exec tip_by_state;
+
+
+/
+-- commit the changes and script.
+commit;
